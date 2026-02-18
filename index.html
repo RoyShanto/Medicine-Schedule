@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Medicine Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-blue-50 min-h-screen flex items-center justify-center p-4 sm:p-8">
+
+    <div class="bg-white shadow-2xl rounded-3xl p-4 sm:p-8 w-full max-w-xl sm:max-w-5xl">
+        <h1 class="text-2xl sm:text-3xl font-bold text-center text-blue-700 mb-6">My Medicine Schedule</h1>
+        <div id="medicineList" class="overflow-x-auto mb-6"></div>
+        <div id="othersSection" class="overflow-x-auto mb-6"></div>
+        <div id="timeButtons" class="flex flex-col sm:flex-row justify-between gap-3"></div>
+    </div>
+
+    <!-- Modal -->
+    <div id="noteModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4">
+        <div
+            class="bg-white rounded-3xl shadow-xl w-full max-w-md p-4 sm:p-6 relative transform scale-95 transition-transform duration-200">
+            <h3 class="text-xl sm:text-2xl font-bold mb-4 text-blue-700">Note</h3>
+            <p id="noteContent" class="text-gray-700 mb-6 sm:text-base whitespace-pre-line"></p>
+            <button onclick="closeModal()"
+                class="absolute top-3 right-3 text-gray-500 hover:text-gray-800 font-bold text-2xl">&times;</button>
+            <button onclick="closeModal()"
+                class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl w-full sm:w-auto">Close</button>
+        </div>
+    </div>
+
+    <script>
+        const medicines = [
+            { name: "Siglimet TM 50/500", morning: 1, afterFood: true },
+            { name: "Rosu 5", night: 1, afterFood: true },
+            { name: "Salazine 500", morning: 0.5, night: 0.5, afterFood: true, note: "First 5 days [18-Feb-22-Feb]: 0.5 + 0.5, Next 5 days [23-Feb-27-Feb]: 1 + 1, Next 5 days [28-Feb - 04-Mar]: 2 + 1, Next 5 days [05-Mar - 09-Mar]: 2 + 2" },
+            { name: "Fexo 120", night: 1, afterFood: true },
+            { name: "Montene 10", night: 1, afterFood: true },
+            { name: "Xyril 25", night: 1, afterFood: true },
+            { name: "Opal 20 (Gastric)", night: 1, beforeFood: true }
+        ];
+        const others = [
+            { name: "Lorix Plus (Lotion)", morning: 1, noon: 1, night: 1, note: "Use after shower, Dry body properly, Use 3 days per week." }
+        ];
+        const times = ['morning', 'noon', 'night'], colors = { morning: 'yellow', noon: 'green', night: 'indigo' };
+
+        const generateButtons = () => {
+            const container = document.getElementById('timeButtons');
+            container.innerHTML = '';
+            times.forEach(t => {
+                const btn = document.createElement('button');
+                btn.innerText = t[0].toUpperCase() + t.slice(1);
+                btn.className = `time-btn flex-1 font-semibold py-2 rounded-xl transition text-sm sm:text-base bg-${colors[t]}-400 hover:bg-${colors[t]}-500 text-white`;
+                btn.onclick = () => { showMedicine(t); setActiveButton(btn); };
+                container.appendChild(btn);
+            });
+        };
+
+        const setActiveButton = btn => {
+            document.querySelectorAll('.time-btn').forEach(b => b.classList.remove('ring-4', 'ring-offset-2', 'ring-blue-500', 'opacity-90'));
+            btn.classList.add('ring-4', 'ring-offset-2', 'ring-blue-500', 'opacity-90');
+        };
+
+        const generateTable = (items, time, title, color, isMed = true) => {
+            const headers = isMed ? ['S/N', 'Medicine', 'Dose', 'Food', 'Note'] : ['S/N', 'Item', 'Usage', 'Note'];
+            const rows = items.length ? items.map((item, i) => {
+                const dose = time === 'all' ? times.filter(t => item[t]).map(t => `${t[0].toUpperCase() + t.slice(1)}: ${item[t]}`).join(', ') :
+                    `${isMed ? 'Take' : 'Use'} ${item[time]}${isMed ? '' : ' time(s)'}`;
+                const food = isMed ? (item.afterFood ? 'After Food' : item.beforeFood ? 'Before Food' : '') : '';
+                const foodCls = item.afterFood ? 'text-green-700 font-semibold' : item.beforeFood ? 'text-red-700 font-semibold' : '';
+                const noteBtn = item.note ? `<button onclick="showNoteModal(\`${item.note}\`)" class="bg-${color}-700 hover:bg-${color}-800 text-white px-3 py-1 rounded-xl text-xs sm:text-base cursor-pointer">Note</button>` : '-';
+                return `<tr class="border-b hover:bg-gray-50 even:bg-gray-50 odd:bg-white">
+                    <td class="py-2 px-2 sm:px-4 font-semibold">${i + 1}</td>
+                    <td class="py-2 px-2 sm:px-4 font-semibold">${item.name}</td>
+                    <td class="py-2 px-2 sm:px-4 sm:text-base">${dose}</td>
+                    ${isMed ? `<td class="py-2 px-2 sm:px-4 ${foodCls} sm:text-base">${food}</td>` : ''}
+                    <td class="py-2 px-2 sm:px-4">${noteBtn}</td>
+                </tr>`;
+            }).join('') : `<tr class="bg-gray-100"><td colspan="${headers.length}" class="py-4 px-2 text-center text-gray-500 sm:text-base">No ${isMed ? 'medicines' : 'items'} for this time.</td></tr>`;
+
+            return `<h2 class="text-xl sm:text-2xl font-semibold mb-3 text-${color}-600">${title}</h2>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full bg-white rounded-2xl overflow-hidden shadow-lg text-sm sm:text-base">
+                        <thead class="bg-${color}-600 text-white text-sm sm:text-base"><tr>${headers.map(h => `<th class="py-2 px-2 sm:px-4 text-left">${h}</th>`).join('')}</tr></thead>
+                        <tbody class="text-gray-700">${rows}</tbody>
+                    </table>
+                </div>`;
+        };
+
+        const showMedicine = (time = 'all') => {
+            document.getElementById('medicineList').innerHTML = generateTable(medicines.filter(m => time === 'all' || m[time]), time, 'Medicines', 'blue', true);
+            document.getElementById('othersSection').innerHTML = generateTable(others.filter(o => time === 'all' || o[time]), time, 'External Items', 'purple', false);
+        };
+
+        const showNoteModal = note => {
+            document.getElementById('noteContent').innerText = note.split(',').map(s => s.trim()).join('\n');
+            const modal = document.getElementById('noteModal'), c = modal.firstElementChild;
+            modal.classList.remove('hidden'); c.classList.remove('scale-100'); c.classList.add('scale-95'); setTimeout(() => c.classList.add('scale-100'), 10);
+        };
+
+        const closeModal = () => document.getElementById('noteModal').classList.add('hidden');
+
+        generateButtons();
+        window.onload = () => showMedicine('all');
+    </script>
+
+</body>
+
+</html>
